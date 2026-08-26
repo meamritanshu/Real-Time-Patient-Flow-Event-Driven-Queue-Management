@@ -1,0 +1,25 @@
+{
+  "name": "mediq-server",
+  "version": "1.0.0",
+  "description": "Backend API and WebSocket Server for Real-Time Patient Flow & Queue Management",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ioredis": "^5.4.1",
+    "mongoose": "^8.4.1",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "ioredis-mock": "^8.9.0",
+    "mongodb-memory-server": "^9.2.0",
+    "nodemon": "^3.1.2"
+  }
+}
