@@ -1,12 +1,49 @@
-# MediQ: Real-Time Patient Flow & Event-Driven Queue Management System
+<div align="center">
 
-MediQ is a high-concurrency, event-driven queue management system designed for modern healthcare clinics and hospital Outpatient Departments (OPD). It eliminates crowded waiting rooms and unpredictable wait times through **concurrency-safe atomic token booking**, a **Weighted Moving Average (WMA) dynamic ETA engine**, **sub-millisecond Redis caching**, and **real-time WebSocket synchronization**.
+  <h1>🏥 MediQ</h1>
+  <h3>Real-Time Patient Flow & Event-Driven Queue Management Engine</h3>
+
+  <p>
+    An enterprise-grade, high-concurrency event-driven OPD queue management system powered by 
+    <b>Node.js, Express, Socket.io, MongoDB, Redis, React, and Tailwind CSS</b>.
+  </p>
+
+  <p>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-v25.6-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" /></a>
+    <a href="https://expressjs.com"><img src="https://img.shields.io/badge/Express.js-v4.19-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" /></a>
+    <a href="https://socket.io"><img src="https://img.shields.io/badge/Socket.io-v4.7-010101?style=for-the-badge&logo=socketdotio&logoColor=white" alt="Socket.io" /></a>
+    <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/MongoDB-v8.3-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" /></a>
+    <a href="https://redis.io"><img src="https://img.shields.io/badge/Redis-v8.10-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" /></a>
+    <a href="https://reactjs.org"><img src="https://img.shields.io/badge/React-v18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" /></a>
+    <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-v3.4-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" /></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-F7B93E?style=for-the-badge" alt="License" /></a>
+  </p>
+
+  <br />
+
+  <a href="#-live-demonstration"><strong>📹 Watch Live Demo</strong></a> •
+  <a href="#-key-features"><strong>✨ Key Features</strong></a> •
+  <a href="#-system-architecture"><strong>📐 Architecture</strong></a> •
+  <a href="#-quick-start-guide"><strong>🚀 Quick Start</strong></a> •
+  <a href="./docs"><strong>📚 Full Documentation</strong></a>
+
+</div>
+
+<br />
+
+---
+
+## 📹 Live Demonstration
+
+> **Watch real-time WebSocket synchronization in action**: Clicking *"Call Next Patient"* on the **Clinic Control Desk** (left) immediately updates the **Patient Mobile Card** (right) live over WebSockets without any page refreshes!
+
+![MediQ Live Real-Time Demo](./docs/assets/demo_recording.webp)
 
 ---
 
 ## 📚 Technical Documentation Index
 
-Detailed technical documentations are available in the [`docs/`](./docs) folder:
+Detailed technical specifications and design documents are available in the [`docs/`](./docs) folder:
 
 - 📌 [**Project Details & Domain Context**](./docs/PROJECT_DETAILS.md): Problem statement, OPD queue challenges, core objectives, and user workflows.
 - 📐 [**Technical Specifications & System Architecture**](./docs/TECHNICAL_DETAILS.md): Database schemas, atomic `$inc` concurrency algorithms, WMA math breakdown, Redis caching strategy, REST endpoints, and Socket.io events.
@@ -15,36 +52,123 @@ Detailed technical documentations are available in the [`docs/`](./docs) folder:
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features & Screenshots
 
-- **⚡ Concurrency-Safe Atomic Token Booking**: Uses MongoDB `$inc` atomic updates on `QueueState.lastIssuedToken` to guarantee zero duplicate tokens or race conditions under high concurrent traffic.
-- **⏱️ Dynamic WMA ETA Engine**: Calculates dynamic wait times using a rolling Weighted Moving Average ($w = [0.1, 0.2, 0.3, 0.4]$) of a doctor's recent consultation durations.
-- **🚀 Sub-Millisecond Redis Caching**: Fast queue state snapshots cached at `queue:state:${doctorId}` with instant invalidation on state mutations.
-- **📡 Sub-Second Socket.io Broadcasts**: Real-time room broadcasts (`queue:state_updated`, `queue:next_called`, `queue:emergency_alert`) keep patients and clinic staff synchronized without screen refreshes.
-- **👨‍⚕️ Clinic Control Desk**: Doctor/receptionist interface featuring an active consultation hero card, live ticking stopwatch (`mm:ss`), one-click action controls (Call Next, Complete, Skip, Pause/Resume, Emergency Triage), and skipped patient recall buffer.
-- **📱 Patient Mobile View**: Smartphone view featuring token cards, live "Now Serving" counter, "X Patients Ahead" count, live WMA wait time counter, and self check-in button.
-- **⚡ Side-by-Side Dual View**: Dual-column layout demonstrating live real-time WebSocket synchronization in a single browser window.
-- **🛡️ Zero-Friction Fallback**: Automatic in-memory fallback to `mongodb-memory-server` and `ioredis-mock` if native MongoDB/Redis instances are offline.
+### 1. ⚡ Side-by-Side Dual View Mode
+Simultaneously view the **Clinic Control Desk** (Doctor/Receptionist) and the **Patient Mobile View** on a single screen to experience sub-second real-time event synchronization.
+
+![Initial Dual View](./docs/assets/initial_dual_view.png)
 
 ---
 
-## 🛠️ Tech Stack
+### 2. 👨‍⚕️ Clinic Control Desk & Ticking Stopwatch
+Doctors have access to a live consultation stopwatch ticking in `mm:ss`, Weighted Moving Average (WMA) average duration indicator, and one-click action controls (**Call Next**, **Complete**, **Skip**, **Pause/Resume**, and **Emergency Triage**).
 
-- **Backend**: Node.js, Express.js, Socket.io, Mongoose (MongoDB), ioredis (Redis), MongoMemoryServer, ioredis-mock.
-- **Frontend**: Vite, React 18, Tailwind CSS, Lucide React, socket.io-client.
-- **Databases**: MongoDB Community (v8.3), Redis Server (v8.10).
+![Call Next Patient Action](./docs/assets/call_next_patient.png)
+
+---
+
+### 3. 📱 Patient Mobile View & Dynamic ETA Counter
+Patients view their personal token card with a live *"Now Serving"* indicator, *"X Patients Ahead"* counter, dynamic live wait time estimate (*"Estimated Wait: ~18 mins"*), and a one-click **Self Check-In** button.
+
+![Patient Checked In](./docs/assets/patient_checked_in.png)
+
+---
+
+### 4. 🚨 Emergency Triage Priority Insertion
+Receptionists or doctors can insert urgent triage patients immediately behind the active consultation with **Priority Score 100**, automatically updating position order and triggering instant room alerts.
+
+![Emergency Triage Insertion](./docs/assets/emergency_triage.png)
+
+---
+
+### 5. 🛡️ Zero-Friction Automatic Fallback
+No local database daemons running? No problem! MediQ includes an intelligent fallback mechanism:
+- **MongoDB**: Automatically connects to native MongoDB (`mongodb://127.0.0.1:27017`). If unreachable, transparently spins up `mongodb-memory-server`.
+- **Redis**: Connects to native Redis (`redis://127.0.0.1:6379`). If unreachable, transparently falls back to `ioredis-mock`.
+
+---
+
+## 📐 System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Frontend["React 18 Dual Client"]
+        CD["👨‍⚕️ Clinic Control Desk"]
+        PMV["📱 Patient Mobile View"]
+    end
+
+    subgraph Backend["Node.js / Express Server (Port 5001)"]
+        API["⚡ REST API Controllers"]
+        WMA["🧮 Dynamic WMA Engine"]
+        SIO["📡 Socket.io Room Manager"]
+    end
+
+    subgraph Database["Persistence & Cache"]
+        MONGO[("🍃 MongoDB Community\nAtomic $inc Booking")]
+        REDIS[("⚡ Redis Cache\nsub-ms Snapshots")]
+    end
+
+    CD -->|HTTP REST| API
+    PMV -->|HTTP REST| API
+    API -->|Atomic $inc| MONGO
+    API -->|Snapshot Cache| REDIS
+    API -->|State Mutation| SIO
+    SIO -->|queue:state_updated| CD
+    SIO -->|queue:state_updated & queue:next_called| PMV
+```
+
+---
+
+## 🧮 Dynamic ETA Engine Math
+
+Rather than relying on static estimates, MediQ calculates a **Weighted Moving Average (WMA)** of a doctor's recent consultation durations:
+
+$$WMA = 0.1 \times d_1 + 0.2 \times d_2 + 0.3 \times d_3 + 0.4 \times d_4$$
+
+For any token $K$ at position $i$ in line (0-indexed):
+
+$$\text{Active Remaining Time} = \max\left(0, WMA - \frac{\text{Now} - \text{StartTime}_{\text{active}}}{60000}\right)$$
+
+$$\text{Dynamic ETA (mins)} = (i \times WMA) + \text{Active Remaining Time}$$
+
+---
+
+## 📡 API & WebSocket Event Reference
+
+### REST Endpoints (`/api/queue`)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/state/:doctorId` | GET | Returns full queue state snapshot with calculated ETAs |
+| `/book` | POST | Atomically books a new token using MongoDB `$inc` |
+| `/checkin` | POST | Confirms patient arrival check-in timestamp |
+| `/next` | POST | Calls next patient in priority order (Emergency > Checked-In > Booked) |
+| `/complete` | POST | Completes active consultation and recalculates WMA |
+| `/skip` | POST | Moves absent patient to skipped buffer |
+| `/emergency` | POST | Inserts urgent patient with Priority Score 100 |
+| `/toggle-pause` | POST | Toggles queue between `ACTIVE` and `PAUSED` |
+
+### Real-Time Socket.io Events
+
+| Event Name | Type | Description |
+|---|---|---|
+| `join_doctor_room` | Incoming | Subscribes client socket to doctor room |
+| `queue:state_updated` | Broadcast | Emits fresh full state snapshot to all room clients |
+| `queue:next_called` | Broadcast | Emits alert payload when doctor calls next token |
+| `queue:emergency_alert` | Broadcast | Emits alert toast when emergency triage is inserted |
+| `queue:eta_updated` | Broadcast | Emits live updated ETAs when consultation completes |
 
 ---
 
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
-- Node.js (v18+ or v25+)
-- npm (v9+)
-- *(Optional)* Homebrew for native MongoDB & Redis daemons
+- **Node.js**: v18.0.0 or higher (v25.6 recommended)
+- **npm**: v9.0.0 or higher
+- *(Optional)* Homebrew for native MongoDB & Redis services
 
-### 1. Installation
-Clone the repository and install all monorepo dependencies:
+### 1. Clone & Install Dependencies
 
 ```bash
 git clone https://github.com/meamritanshu/Real-Time-Patient-Flow-Event-Driven-Queue-Management.git
@@ -52,48 +176,48 @@ cd Real-Time-Patient-Flow-Event-Driven-Queue-Management
 npm run install:all
 ```
 
-### 2. Start Databases (Optional Native Services)
-MediQ includes automatic in-memory fallbacks, but if you want native database services:
+### 2. Start Native Database Services (Optional)
 
 ```bash
 brew services start mongodb/brew/mongodb-community
 brew services start redis
 ```
+*(If native services are not started, MediQ will automatically fall back to MongoMemoryServer and ioredis-mock).*
 
-### 3. Seed Default Mock Data
-Seed default mock data for `dr_sharma_01` (Dr. Ananya Sharma, Cardiology):
+### 3. Seed Mock Data
+Seed realistic mock queue data for `dr_sharma_01` (Dr. Ananya Sharma, Cardiology):
 
 ```bash
 npm run seed
 ```
 
-### 4. Launch Development Servers
-Launch both Express backend server (Port 5001) and Vite React client (Port 5173) concurrently:
+### 4. Launch Application
 
 ```bash
 npm run dev
 ```
 
-Open your browser and visit:
-- **Application URL**: `http://localhost:5173`
-- **Backend Health Check**: `http://localhost:5001/health`
+Visit the application in your browser:
+- **Frontend App**: `http://localhost:5173`
+- **Backend API**: `http://localhost:5001/health`
 
 ---
 
-## 🔌 API & Event Overview
+## 🧪 Running Component Scripts
 
-### REST Endpoints (`/api/queue`)
-- `GET /state/:doctorId` - Fetch queue snapshot with dynamic ETAs
-- `POST /book` - Atomically book a new token
-- `POST /checkin` - Confirm patient arrival check-in
-- `POST /next` - Call next patient in priority order
-- `POST /complete` - Complete consultation & update WMA duration
-- `POST /skip` - Move absent patient to skipped buffer
-- `POST /emergency` - Insert urgent triage patient (Priority Score 100)
-- `POST /toggle-pause` - Toggle queue between ACTIVE and PAUSED
+```bash
+# Run backend server only
+npm run dev:server
+
+# Run frontend client only
+npm run dev:client
+
+# Seed database
+npm run seed
+```
 
 ---
 
 ## 📜 License
 
-MIT License. Designed and engineered for high-concurrency healthcare queue management.
+Distributed under the **MIT License**. See [`LICENSE`](./LICENSE) for details.
