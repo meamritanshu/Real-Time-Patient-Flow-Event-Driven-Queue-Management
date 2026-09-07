@@ -9,12 +9,15 @@
  * @returns {number} WMA in minutes (rounded to 1 decimal place, minimum 1 min)
  */
 export const calculateWMA = (durations) => {
-  if (!durations || durations.length === 0) {
+  if (!durations || !Array.isArray(durations) || durations.length === 0) {
     return 10.0; // Default baseline 10 minutes
   }
 
+  // Clamp the consultation durations to be between 1 and 60 minutes
+  const clampedDurations = durations.map((duration) => Math.min(Math.max(Number(duration) || 0, 1.0), 60.0));
+
   // Take the last 4 consultations (most recent last)
-  const recent4 = durations.slice(-4);
+  const recent4 = clampedDurations.slice(-4);
   const targetWeights = [0.1, 0.2, 0.3, 0.4];
 
   if (recent4.length === 4) {
