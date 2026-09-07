@@ -2,6 +2,7 @@ import { QueueState } from '../models/QueueState.js';
 import { Token } from '../models/Token.js';
 import { calculateWMA, calculateQueueETAs } from './etaEngine.js';
 import { getRedisClient } from '../config/redis.js';
+import { notifyPatientNextInLine } from './notificationService.js';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -12,11 +13,10 @@ const getTodayDateString = () => {
 };
 
 const getTodayDateRange = () => {
-  // Use UTC midnight boundaries for consistent querying
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-  return { start, end };
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  return { $gte: start, $lte: end };
 };
 
 export const getQueueSnapshot = async (doctorId) => {
@@ -48,20 +48,20 @@ export const getQueueSnapshot = async (doctorId) => {
     });
   }
 
-  const { start, end } = getTodayDateRange();
+  const dateQuery = { bookingTime: getTodayDateRange() };
 
   // Fetch currently serving token
   const currentlyServing = await Token.findOne({
     doctorId,
     status: 'IN_CONSULTATION',
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   }).sort({ updatedAt: -1 });
 
   // Fetch waiting / active tokens (EMERGENCY, CHECKED_IN, BOOKED)
   const waitingTokens = await Token.find({
     doctorId,
     status: { $in: ['EMERGENCY', 'CHECKED_IN', 'BOOKED'] },
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   }).sort({
     priorityScore: -1,   // Emergency triage (100) first
     tokenNumber: 1,      // Sequential token order
@@ -71,14 +71,14 @@ export const getQueueSnapshot = async (doctorId) => {
   const completedTokens = await Token.find({
     doctorId,
     status: 'COMPLETED',
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   }).sort({ consultationEndTime: -1 });
 
   // Fetch skipped tokens
   const skippedTokens = await Token.find({
     doctorId,
     status: 'SKIPPED',
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   }).sort({ updatedAt: -1 });
 
   const wma = calculateWMA(queueState.recentConsultationDurations);
@@ -173,8 +173,11 @@ export const bookToken = async ({ clinicId = 'apollo_main_01', doctorId, patient
 };
 
 export const checkInToken = async ({ doctorId, tokenNumber, tokenId }) => {
-  const { start, end } = getTodayDateRange();
-  const query = tokenId ? { _id: tokenId } : { doctorId, tokenNumber: Number(tokenNumber), bookingTime: { $gte: start, $lte: end } };
+  const query = tokenId ? { _id: tokenId } : {
+    doctorId,
+    tokenNumber: Number(tokenNumber),
+    bookingTime: getTodayDateRange()
+  };
   
   const token = await Token.findOne(query);
   if (!token) {
@@ -201,13 +204,13 @@ export const callNextPatient = async (doctorId) => {
     throw new Error('Queue state not initialized for doctor');
   }
 
-  const { start, end } = getTodayDateRange();
+  const dateQuery = { bookingTime: getTodayDateRange() };
 
   // Find next eligible patient (EMERGENCY first, then CHECKED_IN / BOOKED by tokenNumber)
   const nextToken = await Token.findOne({
     doctorId,
     status: { $in: ['EMERGENCY', 'CHECKED_IN', 'BOOKED'] },
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   }).sort({
     priorityScore: -1,
     tokenNumber: 1,
@@ -218,18 +221,19 @@ export const callNextPatient = async (doctorId) => {
   }
 
   // If there was an active patient in consultation, mark them completed first
-  const currentActive = await Token.findOne({ doctorId, status: 'IN_CONSULTATION', bookingTime: { $gte: start, $lte: end } });
+  const currentActive = await Token.findOne({ doctorId, status: 'IN_CONSULTATION', ...dateQuery });
   if (currentActive) {
-    const startTime = currentActive.consultationStartTime || currentActive.updatedAt;
-    const elapsedMinutes = Math.min(Math.max(1, Math.round((Date.now() - new Date(startTime).getTime()) / (1000 * 60))), 60);
+    const startTime = currentActive.consultationStartTime; // Ensure we only calculate if start time exists to avoid skewed data from updatedAt
+    if (startTime) {
+      const elapsedMinutes = Math.min(Math.max(1, Math.round((Date.now() - new Date(startTime).getTime()) / (1000 * 60))), 60);
+      queueState.recentConsultationDurations.push(elapsedMinutes);
+      if (queueState.recentConsultationDurations.length > 5) {
+        queueState.recentConsultationDurations = queueState.recentConsultationDurations.slice(-5);
+      }
+    }
     currentActive.status = 'COMPLETED';
     currentActive.consultationEndTime = new Date();
     await currentActive.save();
-
-    queueState.recentConsultationDurations.push(elapsedMinutes);
-    if (queueState.recentConsultationDurations.length > 5) {
-      queueState.recentConsultationDurations = queueState.recentConsultationDurations.slice(-5);
-    }
   }
 
   // Update next token to IN_CONSULTATION
@@ -241,19 +245,38 @@ export const callNextPatient = async (doctorId) => {
   await queueState.save();
 
   await invalidateRedisCache(doctorId);
+
+  // Notify patients who are nearly next in line (e.g., 1 or 2 patients ahead)
+  const subsequentTokens = await Token.find({
+    doctorId,
+    status: { $in: ['EMERGENCY', 'CHECKED_IN', 'BOOKED'] },
+    ...dateQuery,
+  }).sort({
+    priorityScore: -1,
+    tokenNumber: 1,
+  }).limit(2);
+
+  for (const t of subsequentTokens) {
+    // Only simulate sending SMS to these near tokens
+    await notifyPatientNextInLine(t);
+  }
+
   return nextToken;
 };
 
 export const completeConsultation = async (doctorId) => {
-  const { start, end } = getTodayDateRange();
-  const activeToken = await Token.findOne({ doctorId, status: 'IN_CONSULTATION', bookingTime: { $gte: start, $lte: end } });
+  const dateQuery = { bookingTime: getTodayDateRange() };
+  const activeToken = await Token.findOne({ doctorId, status: 'IN_CONSULTATION', ...dateQuery });
   if (!activeToken) {
     throw new Error('No active consultation currently in progress');
   }
 
-  const startTime = activeToken.consultationStartTime || new Date();
   const endTime = new Date();
-  const elapsedMinutes = Math.min(Math.max(1, Math.round((endTime.getTime() - new Date(startTime).getTime()) / (1000 * 60))), 60);
+
+  let elapsedMinutes = 0;
+  if (activeToken.consultationStartTime) {
+    elapsedMinutes = Math.min(Math.max(1, Math.round((endTime.getTime() - new Date(activeToken.consultationStartTime).getTime()) / (1000 * 60))), 60);
+  }
 
   activeToken.status = 'COMPLETED';
   activeToken.consultationEndTime = endTime;
@@ -261,7 +284,7 @@ export const completeConsultation = async (doctorId) => {
 
   const date = getTodayDateString();
   const queueState = await QueueState.findOne({ doctorId, date });
-  if (queueState) {
+  if (queueState && elapsedMinutes > 0) {
     queueState.recentConsultationDurations.push(elapsedMinutes);
     if (queueState.recentConsultationDurations.length > 5) {
       queueState.recentConsultationDurations = queueState.recentConsultationDurations.slice(-5);
@@ -274,11 +297,11 @@ export const completeConsultation = async (doctorId) => {
 };
 
 export const skipPatient = async (doctorId, tokenNumber) => {
-  const { start, end } = getTodayDateRange();
+  const dateQuery = { bookingTime: getTodayDateRange() };
   const token = await Token.findOne({
     doctorId,
     ...(tokenNumber ? { tokenNumber: Number(tokenNumber) } : { status: 'IN_CONSULTATION' }),
-    bookingTime: { $gte: start, $lte: end },
+    ...dateQuery,
   });
 
   if (!token) {

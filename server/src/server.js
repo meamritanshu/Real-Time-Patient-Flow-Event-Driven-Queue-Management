@@ -7,6 +7,7 @@ import { connectDB } from './config/db.js';
 import { initRedisWithFallback } from './config/redis.js';
 import queueRoutes from './routes/queueRoutes.js';
 import { setupQueueSocket } from './sockets/queueSocket.js';
+import { startQueueRolloverCron } from './cron/queueRollover.js';
 
 dotenv.config();
 
@@ -43,6 +44,9 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   await initRedisWithFallback();
+
+  // Start automated cron jobs
+  startQueueRolloverCron();
 
   server.listen(PORT, () => {
     console.log(`🚀 MediQ Server running on port ${PORT}`);
