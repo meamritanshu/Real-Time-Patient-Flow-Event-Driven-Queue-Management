@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
@@ -62,6 +62,31 @@ export const SocketProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  // Track disconnection time for automated state resync
+  const disconnectTimeRef = useRef(null);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleDisconnect = () => {
+      disconnectTimeRef.current = Date.now();
+    };
+    const handleConnect = () => {
+      if (disconnectTimeRef.current && Date.now() - disconnectTimeRef.current > 5000) {
+        console.log('🔄 Reconnected after > 5s, fetching fresh state...');
+        fetchQueueState(doctorId);
+      }
+      disconnectTimeRef.current = null;
+    };
+
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect', handleConnect);
+
+    return () => {
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect', handleConnect);
+    }
+  }, [socket, doctorId, fetchQueueState]);
 
   // Handle room joining & real-time socket events
   useEffect(() => {
