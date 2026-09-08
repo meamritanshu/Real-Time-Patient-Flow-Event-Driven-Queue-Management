@@ -52,5 +52,7 @@ const tokenSchema = new mongoose.Schema(
 
 tokenSchema.index({ doctorId: 1, status: 1 });
 tokenSchema.index({ doctorId: 1, tokenNumber: 1 });
+tokenSchema.index({ doctorId: 1, bookingTime: 1, status: 1 });
+tokenSchema.index({ doctorId: 1, bookingTime: 1, tokenNumber: 1 });
 
 export const Token = mongoose.model('Token', tokenSchema);

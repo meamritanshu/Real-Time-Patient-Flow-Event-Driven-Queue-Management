@@ -13,10 +13,11 @@ const getTodayDateString = () => {
 
 const getTodayDateBoundaries = () => {
   const date = getTodayDateString();
+  const [year, month, day] = date.split('-');
   return {
     date,
-    startOfDay: new Date(`${date}T00:00:00.000Z`),
-    endOfDay: new Date(`${date}T23:59:59.999Z`),
+    startOfDay: new Date(year, month - 1, day, 0, 0, 0, 0),
+    endOfDay: new Date(year, month - 1, day, 23, 59, 59, 999),
   };
 };
 
